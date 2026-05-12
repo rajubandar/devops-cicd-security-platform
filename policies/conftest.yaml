@@ -1,0 +1,16 @@
+# Conftest configuration for OPA policy validation
+# Usage: conftest test deployments/ --policy policies/
+
+policy:
+  - policies/
+
+namespace:
+  - deployment.validation
+  - security.validation
+  - container.validation
+
+failure-template: |
+  Policy violation detected:
+  {{ .Failures }}
+  
+  Fix violations before deploying.

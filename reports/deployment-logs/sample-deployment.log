@@ -1,0 +1,42 @@
+==============================================
+ Deployment Log - DevOps CI/CD Platform
+==============================================
+Timestamp:   2026-05-12T06:00:00Z
+App:         devops-app
+Version:     abc1234
+Environment: development
+Branch:      development
+Deployer:    github-actions[bot]
+Triggered:   Push to development branch
+
+[06:00:01] Stage: Source Checkout
+  ✓ Repository checked out (commit: abc1234)
+  ✓ Fetch depth: full history
+
+[06:00:05] Stage: Build
+  ✓ Docker image built: ghcr.io/rajubandar/devops-app:abc1234
+  ✓ Build time: 45s
+
+[06:00:52] Stage: Test
+  ✓ 15 tests executed
+  ✓ 15 passed, 0 failed
+  ✓ Coverage: 85.2%
+
+[06:01:10] Stage: Security Validation
+  ✓ Conftest installed
+  ✓ OPA policy validation: PASSED
+    - deployment-validation: PASS
+    - security-validation: PASS
+    - container-validation: PASS
+  ✓ SonarQube quality gate: PASSED
+
+[06:01:45] Stage: Deploy
+  ✓ Applying deployment manifest...
+  ✓ kubectl apply -f deployments/app-deployment.yaml
+  ✓ Deployment rolled out: 3/3 replicas ready
+  ✓ Service created: devops-app-service
+
+==============================================
+ DEPLOYMENT SUCCESSFUL
+ Duration: ~2 minutes
+==============================================

@@ -1,0 +1,63 @@
+pipeline:
+  name: devops-cicd-pipeline
+  version: "1.0.0"
+  description: "CI/CD Pipeline for DevOps Security Platform"
+
+  triggers:
+    push:
+      branches:
+        - development
+    pull_request:
+      branches:
+        - staging
+        - production
+
+  environment:
+    DEFAULT_REGION: us-east-1
+    REGISTRY: myregistry.azurecr.io
+    APP_NAME: devops-app
+
+  stages:
+    - name: checkout
+      description: "Checkout source code"
+      steps:
+        - action: git-checkout
+          with:
+            fetch-depth: 0
+
+    - name: build
+      description: "Build application"
+      steps:
+        - action: docker-build
+          with:
+            dockerfile: Dockerfile
+            tag: "${{ env.REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}"
+
+    - name: test
+      description: "Run unit and integration tests"
+      steps:
+        - action: run-tests
+          command: "pytest tests/ -v --cov=src"
+
+    - name: security-scan
+      description: "Security validation with SonarQube and OPA"
+      steps:
+        - action: sonarqube-scan
+        - action: opa-validate
+          command: "conftest test deployments/ --policy policies/"
+
+    - name: deploy
+      description: "Deploy to Kubernetes"
+      steps:
+        - action: kubectl-apply
+          manifest: deployments/app-deployment.yaml
+
+  rollback:
+    enabled: true
+    strategy: previous-deployment
+    trigger: deployment-failure
+
+  artifacts:
+    paths:
+      - artifacts/
+    retention: 30
