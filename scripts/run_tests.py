@@ -6,16 +6,18 @@ import os
 os.makedirs('artifacts', exist_ok=True)
 
 result = subprocess.run(
-    [sys.executable, '-m', 'pytest', 'src/test_app.py', '-v', '--tb=short', '-p', 'no:cacheprovider'],
+    [sys.executable, '-m', 'pytest', 'src/test_app.py',
+     '-v', '--tb=short', '-p', 'no:cacheprovider'],
     capture_output=True,
     text=True
 )
 
-output = result.stdout + result.stderr
-print(output)
+print(result.stdout)
+if result.stderr:
+    print(result.stderr)
 
 with open('artifacts/test-report.txt', 'w') as f:
-    f.write(output)
+    f.write(result.stdout + result.stderr)
 
-print('Tests finished. Exit code was:', result.returncode)
+print('Tests done. pytest exit code:', result.returncode)
 sys.exit(0)
