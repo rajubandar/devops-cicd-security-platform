@@ -29,11 +29,11 @@ jobs:
       - name: Validate project structure
         run: |
           echo "Validating required directories and files..."
-          for dir in configs deployments policies reports artifacts scripts src; do
-            [ -d "$dir" ] && echo "✓ $dir/" || echo "✗ MISSING: $dir/"
+          for dir in configs deployments policies scripts src; do
+            [ -d "$dir" ] && echo "OK $dir/" || echo "MISSING: $dir/"
           done
           for file in configs/deployment.yaml configs/pipeline.yaml configs/security.conf sonar-project.properties; do
-            [ -f "$file" ] && echo "✓ $file" || echo "✗ MISSING: $file"
+            [ -f "$file" ] && echo "OK $file" || echo "MISSING: $file"
           done
 
       - name: Display commit info
@@ -97,31 +97,39 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          pip install pytest pytest-cov
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov yamllint
 
-      - name: Run unit tests
+      - name: Run policy unit tests
         run: |
-          echo "Running unit tests..."
+          echo "Running Python unit tests..."
+          mkdir -p artifacts
           python -m pytest src/test_app.py -v --tb=short 2>&1 | tee artifacts/test-report.txt || true
 
-      - name: Validate YAML configuration files
+      - name: Validate all YAML files are well-formed
         run: |
-          pip install yamllint
-          echo "Linting YAML files..."
-          yamllint -d relaxed configs/ deployments/ || true
+          echo "Linting YAML files with relaxed config..."
+          yamllint -c .yamllint.yml configs/ deployments/ || true
+          echo "YAML validation step completed."
 
       - name: Validate shell scripts
         run: |
-          sudo apt-get install -y shellcheck
+          sudo apt-get install -y shellcheck -qq
           echo "Checking shell scripts..."
           shellcheck scripts/*.sh || true
+
+      - name: Save test summary
+        run: |
+          mkdir -p artifacts
+          echo "{\"test_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"branch\": \"${{ github.ref_name }}\", \"status\": \"completed\"}" > artifacts/test-summary.json
+          cat artifacts/test-summary.json
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: artifacts/test-report.txt
+          path: artifacts/
 
   # --------------------------------------------------------
   # STAGE 4: Security Validation (SonarQube + OPA)
@@ -198,7 +206,7 @@ jobs:
           echo "Deploying to development..."
           echo "Build info:"
           cat artifacts/build-info.json
-          echo "\nDeploy time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Deploy time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "Environment: development"
           echo "Status: SUCCESS"
 
