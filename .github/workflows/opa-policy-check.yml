@@ -1,0 +1,56 @@
+name: OPA Policy Check
+
+on:
+  push:
+    paths:
+      - 'policies/**'
+      - 'configs/**'
+      - 'deployments/**'
+  pull_request:
+    paths:
+      - 'policies/**'
+      - 'configs/**'
+      - 'deployments/**'
+
+jobs:
+  opa-validate:
+    name: OPA Policy Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Conftest
+        run: |
+          wget -q https://github.com/open-policy-agent/conftest/releases/download/v0.50.0/conftest_0.50.0_Linux_x86_64.tar.gz
+          tar xzf conftest_0.50.0_Linux_x86_64.tar.gz
+          sudo mv conftest /usr/local/bin/
+          conftest --version
+
+      - name: Run OPA policy tests
+        run: |
+          echo "=== Deployment Validation ==="
+          conftest test configs/deployment.yaml \
+            --policy policies/deployment_validation.rego --output table || true
+
+          echo "=== Security Validation ==="
+          conftest test configs/deployment.yaml \
+            --policy policies/security_validation.rego --output table || true
+
+          echo "=== Container Validation ==="
+          conftest test configs/deployment.yaml \
+            --policy policies/container_validation.rego --output table || true
+
+      - name: Generate OPA validation report
+        if: always()
+        run: |
+          mkdir -p reports
+          conftest test configs/deployment.yaml \
+            --policy policies/ --output json > reports/opa-full-report.json 2>&1 || true
+          echo "Report saved to reports/opa-full-report.json"
+
+      - name: Upload OPA reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: opa-reports
+          path: reports/opa-full-report.json

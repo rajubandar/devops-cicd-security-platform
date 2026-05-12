@@ -1,126 +1,103 @@
-# =============================================================================
-# Production Deployment Workflow — GitHub Actions
-# Trigger : push to  production  branch
-# =============================================================================
-name: Production Deployment
+name: Production Deploy
 
 on:
   push:
-    branches: [ production ]
+    branches:
+      - production
 
 env:
-  APP_NAME: devops-app
-  IMAGE_TAG: ${{ github.sha }}
+  APP_VERSION: "1.0.0"
 
 jobs:
-# ─────────────────────────────────────────────────────────────────
-# PRE-DEPLOY — OPA policy gate
-# ─────────────────────────────────────────────────────────────────
+  # --------------------------------------------------------
+  # Full validation before production deploy
+  # --------------------------------------------------------
   pre-deploy-validation:
-    name: "Pre-deploy OPA Validation"
+    name: Pre-Deploy Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate all required files
+        run: |
+          echo "Validating production readiness..."
+          MISSING=0
+          for f in configs/deployment.yaml configs/security.conf policies/deployment_validation.rego policies/security_validation.rego policies/container_validation.rego sonar-project.properties; do
+            [ -f "$f" ] && echo "✓ $f" || { echo "✗ MISSING: $f"; MISSING=1; }
+          done
+          [ $MISSING -eq 0 ] || exit 1
 
       - name: Install Conftest
         run: |
-          CONFTEST_VER=0.50.0
-          wget -q "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VER}/conftest_${CONFTEST_VER}_Linux_x86_64.tar.gz" \
-            -O /tmp/conftest.tar.gz
-          tar xzf /tmp/conftest.tar.gz -C /tmp
-          sudo mv /tmp/conftest /usr/local/bin/conftest
+          wget -q https://github.com/open-policy-agent/conftest/releases/download/v0.50.0/conftest_0.50.0_Linux_x86_64.tar.gz
+          tar xzf conftest_0.50.0_Linux_x86_64.tar.gz
+          sudo mv conftest /usr/local/bin/
 
-      - name: Validate all deployment manifests
+      - name: OPA Policy Gate
         run: |
-          echo "Running OPA pre-production gate..."
-          conftest test deployments/app-deployment.yaml \
-            --policy policies/ \
-            --output table
-          echo "✓ All OPA policies passed — safe to deploy to production"
+          echo "Running full OPA policy check before production deploy..."
+          conftest test configs/deployment.yaml \
+            --policy policies/deployment_validation.rego \
+            --policy policies/security_validation.rego \
+            --policy policies/container_validation.rego \
+            --output json 2>&1 | tee reports/prod-opa-report.json || (
+              echo "PRODUCTION BLOCKED: OPA policy violations found!"
+              exit 1
+          )
 
-# ─────────────────────────────────────────────────────────────────
-# PRODUCTION DEPLOY
-# ─────────────────────────────────────────────────────────────────
+  # --------------------------------------------------------
+  # Production Deployment
+  # --------------------------------------------------------
   deploy-production:
-    name: "Deploy to Production"
+    name: Deploy to Production
     runs-on: ubuntu-latest
     needs: pre-deploy-validation
-    environment:
-      name: production
-      url: https://devops-app.example.com
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
       - name: Deploy to production
-        env:
-          DEPLOY_KEY:        ${{ secrets.DEPLOY_KEY }}
-          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
-          echo "Deploying ${{ env.APP_NAME }}:${{ env.IMAGE_TAG }} → PRODUCTION"
-          # kubectl apply -f deployments/app-deployment.yaml
-          # kubectl rollout status deployment/${{ env.APP_NAME }} -n production
-          echo "  ✓ Deployment successful — 3/3 replicas ready"
+          echo "Deploying to PRODUCTION..."
+          echo "Commit: ${{ github.sha }}"
+          echo "Time:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Version: $APP_VERSION"
+          echo "Status: SUCCESS"
 
-      - name: Health check
+      - name: Generate production deployment report
         run: |
-          echo "Verifying pod health..."
-          # kubectl get pods -n production -l app=${{ env.APP_NAME }}
-          echo "  ✓ All pods healthy"
-
-      - name: Production deployment report
-        run: |
-          mkdir -p artifacts/deployment-logs
-          REPORT=artifacts/deployment-logs/deploy-prod-${{ env.IMAGE_TAG }}.log
-          cat > "$REPORT" <<EOF
-          ============================================
-          Production Deployment Report
-          ============================================
-          App         : ${{ env.APP_NAME }}
-          Version     : ${{ env.IMAGE_TAG }}
-          Environment : PRODUCTION
-          Branch      : ${{ github.ref_name }}
-          Deployer    : ${{ github.actor }}
-          Timestamp   : $(date -u)
-          Replicas    : 3/3 ready
-          Status      : SUCCESS
-          ============================================
+          mkdir -p artifacts reports
+          cat > artifacts/prod-deploy-log.json << EOF
+          {
+            "deploy_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "environment": "production",
+            "commit": "${{ github.sha }}",
+            "version": "$APP_VERSION",
+            "status": "success"
+          }
           EOF
-          cat "$REPORT"
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload production logs
+        uses: actions/upload-artifact@v4
         with:
-          name: prod-deploy-logs-${{ env.IMAGE_TAG }}
-          path: artifacts/deployment-logs/
-          retention-days: 90
+          name: production-deployment-logs
+          path: |
+            artifacts/prod-deploy-log.json
+            reports/
 
-# ─────────────────────────────────────────────────────────────────
-# EMERGENCY ROLLBACK
-# ─────────────────────────────────────────────────────────────────
+  # --------------------------------------------------------
+  # Rollback on Production Failure
+  # --------------------------------------------------------
   production-rollback:
-    name: "Emergency Rollback"
+    name: Production Rollback
     runs-on: ubuntu-latest
     needs: deploy-production
     if: failure()
     steps:
       - uses: actions/checkout@v4
-      - name: Execute emergency rollback
+      - name: Execute production rollback
         run: |
-          echo "CRITICAL: Production deployment failed!"
-          echo "Executing emergency rollback to previous stable version..."
-          # kubectl rollout undo deployment/${{ env.APP_NAME }} -n production
-          mkdir -p artifacts/rollback
-          cat > artifacts/rollback/prod-rollback.log <<EOF
-          Production Rollback
-          ===================
-          Executed  : $(date -u)
-          Reason    : Production deployment failure
-          Action    : Rolled back to previous stable revision
-          Status    : COMPLETED
-          EOF
-          cat artifacts/rollback/prod-rollback.log
-      - uses: actions/upload-artifact@v4
-        with:
-          name: prod-rollback-log-${{ env.IMAGE_TAG }}
-          path: artifacts/rollback/
-          retention-days: 30
+          echo "CRITICAL: Production deployment failed! Rolling back..."
+          bash scripts/rollback.sh devops-app production

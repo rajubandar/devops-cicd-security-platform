@@ -2,21 +2,26 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: devops-app
-  namespace: production
+  namespace: default
   labels:
     app: devops-app
-    version: v1.2.3
+    version: "1.0.0"
     environment: production
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: devops-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
         app: devops-app
-        version: v1.2.3
+        version: "1.0.0"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -24,41 +29,34 @@ spec:
         runAsGroup: 1000
         fsGroup: 2000
       containers:
-        - name: devops-app
-          image: myregistry/devops-app:v1.2.3
-          imagePullPolicy: Always
-          securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          ports:
-            - containerPort: 8080
-              protocol: TCP
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "250m"
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
-          env:
-            - name: APP_ENV
-              value: production
-            - name: LOG_LEVEL
-              value: info
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 10
-      automountServiceAccountToken: false
+      - name: devops-app
+        image: devops-app:1.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
