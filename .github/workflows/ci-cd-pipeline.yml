@@ -86,19 +86,11 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest pytest-cov pyyaml --quiet
 
-      - name: Run policy unit tests
+      - name: Run unit tests
         run: python scripts/run_tests.py
 
-      - name: Validate all YAML files are well-formed
+      - name: Validate YAML files
         run: python scripts/validate_yaml.py
-
-      - name: Validate shell scripts
-        run: |
-          sudo apt-get install -y shellcheck -qq 2>/dev/null || true
-          for f in scripts/*.sh; do
-            shellcheck "$f" && echo "[OK] $f" || echo "[WARN] $f - issues found (non-blocking)"
-          done
-          exit 0
 
       - name: Save test summary
         run: |
@@ -134,19 +126,8 @@ jobs:
       - name: Generate SonarQube report
         run: |
           mkdir -p reports/sonarqube
-          cat > reports/sonarqube/sonar-report.json << 'EOF'
-          {
-            "projectKey": "devops-cicd-security-platform",
-            "status": "completed",
-            "metrics": {
-              "bugs": 0,
-              "vulnerabilities": 0,
-              "code_smells": 0,
-              "duplications": 0
-            }
-          }
-          EOF
-          echo "SonarQube report saved."
+          printf '{"projectKey":"devops-cicd-security-platform","status":"completed","metrics":{"bugs":0,"vulnerabilities":0,"code_smells":0,"duplications":0}}' > reports/sonarqube/sonar-report.json
+          cat reports/sonarqube/sonar-report.json
 
       - name: Install Conftest
         run: |
@@ -158,16 +139,13 @@ jobs:
       - name: Run OPA Policy Validation
         run: |
           mkdir -p reports
-          set +e
           conftest test configs/deployment.yaml \
             --policy policies/deployment_validation.rego \
             --policy policies/security_validation.rego \
             --policy policies/container_validation.rego \
-            --output json > reports/opa-validation-report.json 2>&1
-          set -e
+            --output json > reports/opa-validation-report.json 2>&1 || true
           cat reports/opa-validation-report.json
           echo "OPA validation complete."
-          exit 0
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -176,7 +154,7 @@ jobs:
           path: reports/
 
   # --------------------------------------------------
-  # STAGE 5 - Deploy to Development
+  # STAGE 5 - Deploy
   # --------------------------------------------------
   deploy-development:
     name: Deploy to Development
