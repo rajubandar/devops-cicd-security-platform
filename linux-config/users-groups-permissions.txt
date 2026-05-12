@@ -1,0 +1,29 @@
+=== Users Created ===
+username    : developer
+home        : /home/developer
+shell       : /bin/bash
+groups      : developers
+
+username    : tester
+home        : /home/tester
+shell       : /bin/bash
+groups      : developers
+
+username    : devopsadmin
+home        : /home/devopsadmin
+shell       : /bin/bash
+groups      : operations
+
+=== Groups Created ===
+developers  : developer, tester
+operations  : devopsadmin
+
+=== Permissions Assigned ===
+/opt/company-devops-platform
+drwxrwsr-x  root:developers  (developers: read/write via group)
+drwxrwsr-x  devopsadmin:operations (devopsadmin: full admin, owner)
+
+=== File Permissions ===
+-rw-rw-r-- developer:developers  configs/deployment.yaml
+-rw-rw-r-- developer:developers  configs/pipeline.yaml
+-rw-rw-r-- developer:developers  configs/security.conf

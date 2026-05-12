@@ -1,0 +1,41 @@
+company-devops-platform/
+├── configs/
+│   ├── deployment.yaml
+│   ├── pipeline.yaml
+│   └── security.conf
+├── deployments/
+│   └── app-deployment.yaml
+├── policies/
+│   ├── deployment_validation.rego
+│   ├── security_validation.rego
+│   └── container_validation.rego
+├── reports/
+│   ├── sonarqube/
+│   │   └── sonar-report.json
+│   ├── opa-validation-report.json
+│   ├── validation-summary.json
+│   └── deployment-log.json
+├── artifacts/
+│   ├── build-info.json
+│   ├── test-report.txt
+│   ├── test-summary.json
+│   └── deploy-log.json
+├── backup/
+│   ├── deployment_20260512_070000.yaml
+│   ├── pipeline_20260512_070000.yaml
+│   └── security_20260512_070000.conf
+├── scripts/
+│   ├── linux-setup.sh
+│   ├── rollback.sh
+│   ├── run_tests.py
+│   └── validate_yaml.py
+├── src/
+│   ├── app.py
+│   └── test_app.py
+├── .github/
+│   └── workflows/
+│       ├── ci-cd-pipeline.yml
+│       ├── production-deploy.yml
+│       └── opa-policy-check.yml
+├── sonar-project.properties
+└── README.md

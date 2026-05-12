@@ -6,28 +6,42 @@
 
 ## Project Overview
 
-This project implements a full DevOps workflow covering Linux administration, Git & GitHub collaboration, CI/CD automation using GitHub Actions, SonarQube code quality integration, and Open Policy Agent (OPA) policy enforcement.
+This project implements a complete DevOps workflow covering:
+- Linux administration & user management
+- Git & GitHub collaboration with branching strategy
+- CI/CD automation using GitHub Actions
+- SonarQube code quality integration
+- Open Policy Agent (OPA) policy enforcement
+
+---
+
+## Outputs
+
+| Output | Location |
+|---|---|
+| GitHub Repository | https://github.com/rajubandar/devops-cicd-security-platform |
+| Linux Configuration Structure | `linux-config/` |
+| CI/CD Pipeline Configuration | `.github/workflows/ci-cd-pipeline.yml` |
+| SonarQube Reports | `reports/sonarqube/sonar-report.json` |
+| OPA Policies | `policies/` |
+| Validation Reports | `reports/opa-validation-report.json`, `reports/validation-summary.json` |
+| Deployment Logs | `reports/deployment-log.json`, `artifacts/deploy-log.json` |
+| README Documentation | This file |
 
 ---
 
 ## Branching Strategy
 
-| Branch | Purpose | Trigger |
-|---|---|---|
-| `main` | Production-ready code | Manual merge from staging |
-| `development` | Active feature development | Auto CI on every push |
-| `staging` | Pre-production testing | Merge from development |
-| `production` | Live production deployments | Separate deploy workflow |
-
-### Branch Flow
 ```
 feature/* → development → staging → production → main
 ```
 
-- **development**: All new features and bug fixes are pushed here. CI pipeline (build, test, security scan) triggers automatically.
-- **staging**: Integration testing and SonarQube quality gate validation.
-- **production**: Only stable, gate-passing code is deployed. Rollback mechanism is configured.
-- **main**: Mirrors production for reference and documentation.
+| Branch | Purpose | CI Trigger |
+|---|---|---|
+| `main` | Stable reference | Manual |
+| `development` | Active development | Auto on push |
+| `staging` | Pre-prod testing | Merge from dev |
+| `production` | Live deployments | Separate workflow |
 
 ---
 
@@ -35,108 +49,160 @@ feature/* → development → staging → production → main
 
 ```
 company-devops-platform/
-├── configs/
-│   ├── deployment.yaml
-│   ├── pipeline.yaml
-│   └── security.conf
-├── deployments/
-│   └── app-deployment.yaml
-├── policies/
-│   ├── deployment_validation.rego
-│   ├── security_validation.rego
-│   └── container_validation.rego
-├── reports/
-│   └── sonarqube/
-│       └── sonar-report.json
-├── artifacts/
-├── scripts/
-│   ├── linux-setup.sh
-│   └── rollback.sh
-├── src/
-│   └── app.py
-├── sonar-project.properties
-└── README.md
+├── configs/          ← deployment.yaml, pipeline.yaml, security.conf
+├── deployments/      ← Kubernetes manifests
+├── policies/         ← OPA Rego policies
+├── reports/          ← SonarQube + OPA + deployment reports
+├── artifacts/        ← Build + test + deploy artifacts
+├── backup/           ← Timestamped config backups
+├── scripts/          ← Linux setup + rollback scripts
+└── src/              ← Application source code
+```
+
+See full structure: [`linux-config/directory-structure.txt`](linux-config/directory-structure.txt)
+
+---
+
+## 1. Linux Administration
+
+Script: [`scripts/linux-setup.sh`](scripts/linux-setup.sh)
+
+- Creates `company-devops-platform/` with subdirectories: `configs`, `deployments`, `policies`, `reports`
+- **Users**: `developer`, `tester`, `devopsadmin`
+- **Groups**: `developers` (developer + tester), `operations` (devopsadmin)
+- **Permissions**: read/write for developers group, full admin for devopsadmin
+- Timestamped config backups in `backup/`
+- Background process creation and termination demo
+- Compressed archive: `company-devops-platform_<timestamp>.tar.gz`
+
+See output: [`linux-config/linux-setup-output.txt`](linux-config/linux-setup-output.txt)
+
+---
+
+## 2. Git & GitHub Workflow
+
+See: [`docs/git-workflow.md`](docs/git-workflow.md)
+
+### Demonstrated Operations
+
+```bash
+# Stash
+git stash push -m "WIP: feature"
+git stash pop
+
+# Cherry-pick
+git cherry-pick <commit-sha>
+
+# Rebase
+git rebase main
+git rebase -i HEAD~3
+
+# Revert
+git revert HEAD
+
+# Reset
+git reset --soft HEAD~1
+git reset --hard HEAD~1
+
+# Restore deleted file
+git checkout <sha>^ -- <deleted-file>
+
+# Graphical history
+git log --oneline --graph --decorate --all
 ```
 
 ---
 
-## Requirements
+## 3. CI/CD Pipeline (GitHub Actions)
 
-### 1. Linux Administration & User Management
+Workflow: [`.github/workflows/ci-cd-pipeline.yml`](.github/workflows/ci-cd-pipeline.yml)
 
-See [`scripts/linux-setup.sh`](scripts/linux-setup.sh) for complete automation of:
-- Project directory creation (`company-devops-platform` with `configs`, `deployments`, `policies`, `reports`)
-- User creation: `developer`, `tester`, `devopsadmin`
-- Group creation: `developers`, `operations`
-- Permission assignment (read/write for developers, full admin for devopsadmin)
-- Config file creation, backup with timestamps
-- Background process management
-- Compressed archive creation
+| Stage | Description |
+|---|---|
+| Source Checkout | Checkout code, validate structure |
+| Build | Build app, create build-info.json |
+| Test | pytest unit tests + YAML validation |
+| Security Validation | SonarQube scan + OPA policy check |
+| Deploy to Development | Deploy + generate deployment log |
+| Rollback on Failure | Auto rollback if deploy fails |
 
-### 2. Git & GitHub Workflow
+- **Trigger**: Push to `development` branch
+- **Production deploy**: Separate workflow (`.github/workflows/production-deploy.yml`)
+- **Artifacts**: Stored in `artifacts/`
+- **Rollback**: [`scripts/rollback.sh`](scripts/rollback.sh)
 
-- Branches: `development`, `staging`, `production`
-- Separate commits per concern (Linux setup, Git workflow, CI/CD, SonarQube, OPA)
-- Merge conflict simulation and resolution documented in [`docs/git-workflow.md`](docs/git-workflow.md)
-- Git operations demonstrated: `stash`, `cherry-pick`, `rebase`, `revert`, `reset`
+---
 
-### 3. CI/CD Pipeline (GitHub Actions)
+## 4. SonarQube Integration
 
-See [`.github/workflows/ci-cd-pipeline.yml`](.github/workflows/ci-cd-pipeline.yml):
-- Stages: Source Checkout → Build → Test → Security Validation → Deployment
-- Triggers on push to `development`
-- Separate production workflow for `production` branch
-- Rollback on failed deployment
-- Artifacts stored in `artifacts/`
+Config: [`sonar-project.properties`](sonar-project.properties)
 
-### 4. SonarQube Integration
-
-See [`.github/workflows/ci-cd-pipeline.yml`](.github/workflows/ci-cd-pipeline.yml) SonarQube job:
-- Scans YAML files, shell scripts, and source code
-- Reports: bugs, vulnerabilities, code smells, duplicated code
-- Quality gate enforced — pipeline fails if gate fails
+- Scans: `src/`, `scripts/`, `configs/`
+- Quality gate enforced (`sonar.qualitygate.wait=true`)
 - Reports saved to `reports/sonarqube/`
 
-### 5. Open Policy Agent (OPA)
+### Report Summary
 
-See [`policies/`](policies/) directory:
-- [`deployment_validation.rego`](policies/deployment_validation.rego) — prevents insecure deployments
-- [`security_validation.rego`](policies/security_validation.rego) — restricts root user execution
-- [`container_validation.rego`](policies/container_validation.rego) — enforces image tagging and no privileged containers
-- Validation reports generated; deployment fails on policy violation
+| Metric | Value |
+|---|---|
+| Bugs | 0 |
+| Vulnerabilities | 0 |
+| Code Smells | 2 |
+| Duplications | 0% |
+| Coverage | 85% |
+| Quality Gate | ✅ OK |
+
+Full report: [`reports/sonarqube/sonar-report.json`](reports/sonarqube/sonar-report.json)
+
+> **Setup**: Add `SONAR_TOKEN` and `SONAR_HOST_URL` in GitHub → Settings → Secrets and variables → Actions
+
+---
+
+## 5. Open Policy Agent (OPA)
+
+Policies: [`policies/`](policies/)
+
+| Policy File | Enforces |
+|---|---|
+| `deployment_validation.rego` | No missing securityContext, resource limits, health probes |
+| `security_validation.rego` | No root user (UID 0), runAsNonRoot required |
+| `container_validation.rego` | No privileged containers, no `:latest` tag, explicit version required |
+
+Validation report: [`reports/opa-validation-report.json`](reports/opa-validation-report.json)
 
 ---
 
 ## Environment Variables & Secrets
 
-Configured in GitHub repository **Settings → Secrets and variables → Actions**:
+Configure in **Settings → Secrets and variables → Actions**:
 
-| Secret Name | Description |
+| Secret | Description |
 |---|---|
-| `SONAR_TOKEN` | SonarQube authentication token |
+| `SONAR_TOKEN` | SonarQube auth token |
 | `SONAR_HOST_URL` | SonarQube server URL |
 | `DEPLOY_KEY` | Deployment SSH key |
-| `PROD_DEPLOY_KEY` | Production deployment key |
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/rajubandar/devops-cicd-security-platform.git
 cd devops-cicd-security-platform
 
-# Run Linux setup script
+# Run Linux setup
 bash scripts/linux-setup.sh
 
 # Validate OPA policies
 conftest verify --policy policies/
 
-# Run SonarQube scan locally
+# Run SonarQube scan
 sonar-scanner
+
+# Run tests
+python -m pytest src/test_app.py -v
 ```
 
 ---
 
-*Assignment: DevOps CI/CD Security & Version Control Management System*
+*Assignment: DevOps CI/CD Security & Version Control Management System — KIET Group of Institutions*

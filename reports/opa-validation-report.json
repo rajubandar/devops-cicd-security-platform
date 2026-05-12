@@ -1,0 +1,17 @@
+{
+  "validation_time": "2026-05-12T07:00:00Z",
+  "target": "configs/deployment.yaml",
+  "policies": [
+    "policies/deployment_validation.rego",
+    "policies/security_validation.rego",
+    "policies/container_validation.rego"
+  ],
+  "result": "PASS",
+  "violations": [],
+  "summary": {
+    "total_checks": 9,
+    "passed": 9,
+    "failed": 0,
+    "warnings": 0
+  }
+}

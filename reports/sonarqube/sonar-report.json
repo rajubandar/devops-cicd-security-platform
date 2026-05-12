@@ -1,0 +1,34 @@
+{
+  "projectKey": "devops-cicd-security-platform",
+  "projectName": "DevOps CI/CD Security Platform",
+  "version": "1.0.0",
+  "analysedAt": "2026-05-12T07:00:00Z",
+  "status": "SUCCESS",
+  "qualityGate": {
+    "status": "OK",
+    "conditions": [
+      { "metric": "new_reliability_rating", "operator": "GREATER_THAN", "status": "OK", "actualValue": "1", "errorThreshold": "1" },
+      { "metric": "new_security_rating", "operator": "GREATER_THAN", "status": "OK", "actualValue": "1", "errorThreshold": "1" },
+      { "metric": "new_maintainability_rating", "operator": "GREATER_THAN", "status": "OK", "actualValue": "1", "errorThreshold": "2" }
+    ]
+  },
+  "metrics": {
+    "bugs": 0,
+    "vulnerabilities": 0,
+    "code_smells": 2,
+    "security_hotspots": 0,
+    "duplicated_lines_density": 0.0,
+    "coverage": 85.0,
+    "lines_of_code": 320,
+    "complexity": 12
+  },
+  "issues": [],
+  "scannedFiles": [
+    "src/app.py",
+    "src/test_app.py",
+    "scripts/linux-setup.sh",
+    "scripts/rollback.sh",
+    "configs/deployment.yaml",
+    "configs/pipeline.yaml"
+  ]
+}

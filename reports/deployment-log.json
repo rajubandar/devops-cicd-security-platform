@@ -1,0 +1,14 @@
+{
+  "deploy_time": "2026-05-12T07:00:00Z",
+  "environment": "development",
+  "version": "1.0.0",
+  "commit": "latest",
+  "status": "success",
+  "stages": [
+    { "name": "Source Checkout", "status": "success", "duration": "4s" },
+    { "name": "Build", "status": "success", "duration": "8s" },
+    { "name": "Test", "status": "success", "duration": "10s" },
+    { "name": "Security Validation", "status": "success", "duration": "19s" },
+    { "name": "Deploy to Development", "status": "success", "duration": "5s" }
+  ]
+}

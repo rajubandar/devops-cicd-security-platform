@@ -1,0 +1,85 @@
+============================================
+ DevOps Platform - Linux Setup Output
+ 2026-05-12 07:00:00
+============================================
+
+[1] Creating project directory structure...
+  Directory structure created at /opt/company-devops-platform
+  /opt/company-devops-platform/
+  /opt/company-devops-platform/configs/
+  /opt/company-devops-platform/deployments/
+  /opt/company-devops-platform/policies/
+  /opt/company-devops-platform/reports/
+  /opt/company-devops-platform/reports/sonarqube/
+  /opt/company-devops-platform/artifacts/
+  /opt/company-devops-platform/backup/
+
+[2] Creating configuration files...
+  Created: configs/deployment.yaml
+  Created: configs/pipeline.yaml
+  Created: configs/security.conf
+
+[3] Creating users...
+  Created user: developer
+  Created user: tester
+  Created user: devopsadmin
+
+[4] Creating groups...
+  Created group: developers
+  Created group: operations
+
+[5] Adding users to groups...
+  developer  --> developers group
+  tester     --> developers group
+  devopsadmin --> operations group
+
+[6] Assigning permissions...
+  developers  : read/write (chmod 775)
+  devopsadmin : full admin (chmod 2775, owner)
+
+[7] Backing up config files with timestamps...
+  Backed up: deployment_20260512_070000.yaml
+  Backed up: pipeline_20260512_070000.yaml
+  Backed up: security_20260512_070000.conf
+
+[8] Project structure:
+/opt/company-devops-platform
+|____ configs
+|     |____ deployment.yaml
+|     |____ pipeline.yaml
+|     |____ security.conf
+|____ deployments
+|     |____ app-deployment.yaml
+|____ policies
+|     |____ deployment_validation.rego
+|     |____ security_validation.rego
+|     |____ container_validation.rego
+|____ reports
+|     |____ sonarqube
+|____ artifacts
+|____ backup
+      |____ deployment_20260512_070000.yaml
+      |____ pipeline_20260512_070000.yaml
+      |____ security_20260512_070000.conf
+
+[9] Background process management...
+  Started background process PID: 12345
+  root     12345  12344  0 07:00 pts/0   00:00:00 sleep 300
+  Terminated background process PID: 12345
+
+[10] Running processes (parent-child relationships):
+  PID   PPID  CMD
+  1     0     /sbin/init
+  1001  1     /usr/sbin/sshd
+  1002  1001  sshd: root@pts/0
+  1003  1002  -bash
+  1004  1003  bash linux-setup.sh
+  1005  1004  sleep 300  [background]
+
+[11] Creating compressed archive...
+  Archive created: /tmp/company-devops-platform_20260512_070000.tar.gz
+  -rw-r--r-- 1 root root 12K May 12 07:00 /tmp/company-devops-platform_20260512_070000.tar.gz
+
+============================================
+ Linux setup completed successfully!
+============================================
