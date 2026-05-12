@@ -13,45 +13,29 @@ env:
   APP_VERSION: "1.0.0"
   DOCKER_IMAGE: "devops-app"
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
 
-  # --------------------------------------------------------
-  # STAGE 1: Source Checkout
-  # --------------------------------------------------------
   checkout:
     name: Source Checkout
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Validate project structure
         run: |
-          echo "=== Validating project structure ==="
           for dir in configs deployments policies scripts src; do
-            if [ -d "$dir" ]; then echo "[OK] $dir/"; else echo "[MISSING] $dir/"; fi
+            [ -d "$dir" ] && echo "[OK] $dir" || echo "[MISSING] $dir"
           done
-          for file in configs/deployment.yaml configs/pipeline.yaml configs/security.conf sonar-project.properties; do
-            if [ -f "$file" ]; then echo "[OK] $file"; else echo "[MISSING] $file"; fi
-          done
-          echo "=== Validation complete ==="
+          exit 0
 
       - name: Display commit info
         run: |
-          echo "Branch : ${{ github.ref_name }}"
-          echo "Commit : ${{ github.sha }}"
-          echo "Author : ${{ github.actor }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
           git log --oneline -5
 
-  # --------------------------------------------------------
-  # STAGE 2: Build
-  # --------------------------------------------------------
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -59,33 +43,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: pip install pytest pytest-cov
 
       - name: Build application
         run: |
           mkdir -p artifacts
-          BUILD_INFO="{\"version\":\"${APP_VERSION}\",\"build_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"commit\":\"${{ github.sha }}\"}"
-          echo "$BUILD_INFO" > artifacts/build-info.json
+          echo "{\"version\":\"${APP_VERSION}\",\"build_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"commit\":\"${{ github.sha }}\"}" > artifacts/build-info.json
           echo "$DOCKER_IMAGE:$APP_VERSION" > artifacts/previous-image.txt
-          echo "Build info:"
           cat artifacts/build-info.json
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: artifacts/
           retention-days: 30
 
-  # --------------------------------------------------------
-  # STAGE 3: Test
-  # --------------------------------------------------------
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -93,74 +70,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install test dependencies
-        run: pip install pytest pytest-cov
+        run: pip install pytest pytest-cov pyyaml
 
       - name: Run policy unit tests
-        run: |
-          mkdir -p artifacts
-          echo "=== Running unit tests ==="
-          python -m pytest src/test_app.py -v --tb=short -p no:cacheprovider 2>&1 | tee artifacts/test-report.txt
-          echo "=== Tests finished (exit always 0) ==="
-          exit 0
+        run: python scripts/run_tests.py
 
       - name: Validate all YAML files are well-formed
-        run: |
-          echo "=== Validating YAML files ==="
-          python3 - << 'PYEOF'
-          import sys, glob, yaml, os
-          files = glob.glob('configs/*.yaml') + glob.glob('configs/*.yml') + glob.glob('deployments/*.yaml') + glob.glob('deployments/*.yml')
-          errors = []
-          for f in files:
-              try:
-                  with open(f) as fh:
-                      yaml.safe_load(fh)
-                  print(f'[OK] {f}')
-              except yaml.YAMLError as e:
-                  errors.append(f)
-                  print(f'[WARN] {f}: {e}')
-          if errors:
-              print(f'WARNING: {len(errors)} file(s) had YAML issues (non-blocking)')
-          else:
-              print('All YAML files are well-formed.')
-          sys.exit(0)
-          PYEOF
-          echo "=== YAML validation complete ==="
+        run: python scripts/validate_yaml.py
 
       - name: Validate shell scripts
         run: |
-          echo "=== Validating shell scripts ==="
-          if command -v shellcheck &>/dev/null || sudo apt-get install -y shellcheck -qq 2>/dev/null; then
-            for f in scripts/*.sh; do
-              shellcheck "$f" && echo "[OK] $f" || echo "[WARN] $f has shellcheck issues (non-blocking)"
-            done
-          else
-            echo "shellcheck not available, skipping"
-          fi
-          echo "=== Shell validation complete ==="
+          sudo apt-get install -y shellcheck -qq 2>/dev/null || true
+          for f in scripts/*.sh; do
+            shellcheck "$f" && echo "[OK] $f" || echo "[WARN] $f"
+          done
           exit 0
 
       - name: Save test summary
         run: |
           mkdir -p artifacts
-          echo "{\"test_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"branch\":\"${{ github.ref_name }}\",\"status\":\"completed\"}" > artifacts/test-summary.json
+          echo "{\"test_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"completed\"}" > artifacts/test-summary.json
           cat artifacts/test-summary.json
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
           path: artifacts/
 
-  # --------------------------------------------------------
-  # STAGE 4: Security Validation
-  # --------------------------------------------------------
   security-validation:
     name: Security Validation
     runs-on: ubuntu-latest
@@ -186,7 +128,6 @@ jobs:
 
       - name: Run OPA Policy Validation
         run: |
-          echo "=== Running OPA policy validation ==="
           mkdir -p reports
           set +e
           conftest test configs/deployment.yaml \
@@ -194,32 +135,22 @@ jobs:
             --policy policies/security_validation.rego \
             --policy policies/container_validation.rego \
             --output json > reports/opa-validation-report.json 2>&1
-          OPA_RESULT=$?
           set -e
           cat reports/opa-validation-report.json
-          if [ $OPA_RESULT -ne 0 ]; then
-            echo "[WARN] OPA found policy issues - see report above."
-          else
-            echo "[OK] All OPA policy checks passed."
-          fi
+          echo "OPA validation done."
           exit 0
 
       - name: Save security reports
         run: |
           mkdir -p reports/sonarqube
-          echo "{\"scan_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"completed\",\"branch\":\"${{ github.ref_name }}\"}" > reports/sonarqube/sonar-report.json
-          echo "Security reports saved."
+          echo "{\"scan_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"completed\"}" > reports/sonarqube/sonar-report.json
 
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: security-reports
           path: reports/
 
-  # --------------------------------------------------------
-  # STAGE 5: Deploy to Development
-  # --------------------------------------------------------
   deploy-development:
     name: Deploy to Development
     runs-on: ubuntu-latest
@@ -229,46 +160,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
           path: artifacts/
 
-      - name: Deploy to development environment
+      - name: Deploy to development
         run: |
           echo "=== Deploying to development ==="
           cat artifacts/build-info.json
-          echo "Deploy time : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo "Environment : development"
-          echo "Status      : SUCCESS"
+          echo "Deploy time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Status: SUCCESS"
 
       - name: Generate deployment log
         run: |
           mkdir -p artifacts
-          python3 -c "
-import json, datetime
-log = {
-  'deploy_time': datetime.datetime.utcnow().isoformat() + 'Z',
-  'environment': 'development',
-  'branch': '${{ github.ref_name }}',
-  'commit': '${{ github.sha }}',
-  'status': 'success'
-}
-with open('artifacts/deploy-log.json','w') as f:
-  json.dump(log, f, indent=2)
-print('Deployment log saved.')
-"
+          echo "{\"deploy_time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"environment\":\"development\",\"status\":\"success\"}" > artifacts/deploy-log.json
+          cat artifacts/deploy-log.json
 
-      - name: Upload deployment logs
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: deployment-logs
           path: artifacts/deploy-log.json
 
-  # --------------------------------------------------------
-  # Rollback on Failure
-  # --------------------------------------------------------
   rollback-on-failure:
     name: Rollback on Failure
     runs-on: ubuntu-latest
